@@ -1,0 +1,503 @@
+---
+title: "Heart Attack Analysis_AS"
+author: "Apurva Sharma & Rezwan Mazumdar"
+date: "5/23/2021"
+output: pdf_document
+---
+```{r, echo=TRUE, results='hide', message=FALSE, comment="", warning =FALSE}
+library(readr)
+library(tinytex)
+library(tidyverse)
+library(ggvis)
+library(caTools)
+library(rpart)
+library(class)
+library(rpart.plot)
+library(ggplot2)
+library(ggplot2)
+library(ggcorrplot)
+library(tibble)
+library(purrr)
+library(knitr)
+library(tidyverse, warn.conflict=F)
+library(ggdendro) 
+```
+
+ 
+<center> <h1>OBJECTIVE </h1> </center>
+
+
+- This report shall be representative of anlaysis of various predictors for heart attack
+
+- We have secured the Data set from Kaggle(https://www.kaggle.com/johnsmith88/heart-disease-dataset) and the Data has the below attributes:
+
+(i) 1025 patients have been studied for the primary symptoms which lead to  heart attack/s
+(ii) 13 predictors - Age,sex, chest pain, Resting ECG,Exercise induced Angina, cholesterol, Resting Blood Pressure, Fasting blood sugar, presence of major blood vessels, maximum heart rate achieved.
+(iii) Description of variables:
+
+- Age : Age of the patient
+- Sex : Sex of the patient
+- exang: exercise induced angina (1 = yes; 0 = no)
+- ca: number of major vessels (0-3)
+- cp : Chest Pain type chest pain type
+- Value 1: typical angina
+- Value 2: atypical angina
+- Value 3: non-anginal pain
+- Value 4: asymptomatic
+- trtbps : resting blood pressure (in mm Hg)
+- chol : cholestoral in mg/dl fetched via BMI sensor
+- fbs : (fasting blood sugar > 120 mg/dl) (1 = true; 0 = false)
+- rest_ecg : resting electrocardiographic results
+- thal : normal(0), fixed defect(1) and reversible defect(2)
+Value 0: normal
+Value 1: having ST-T wave abnormality (T wave inversions and/or ST elevation or depression of > 0.05 mV)
+Value 2: showing probable or definite left ventricular hypertrophy by Estes' criteria
+- thalach : maximum heart rate achieved
+- target :
+0 = less chance of heart attack
+1 = more chance of heart attack
+
+- The project includes data reading, data exploration & manipulation, 4 classification prediction models:
+(i) KNN - Nearest Neighbor
+(ii) Linear Regression Model
+(iii) Decision Tree
+(iv) XG Boost
+
+\newpage
+
+
+
+## Converting the data into dataframe and dropping all the NA's
+```{r, echo=TRUE, message=FALSE, comment="", warning =FALSE}
+heart = read_csv("/Users/apurvasharma/Downloads/heart (1).csv")
+heart = na.omit(heart)
+```
+
+
+## Creating duplicate datasets and changing columns with factorial
+
+```{r, echo=TRUE, message=FALSE, comment="", warning =FALSE}
+heart_a = heart
+heart_a$disease = factor(heart_a$target,
+                         levels=c(0,1),
+                         labels=c("No","Yes"))
+heart_a$sex = factor(heart_a$sex,
+                     levels=c(0,1),
+                     labels=c("Female","Male"))
+```
+\newpage
+## Data Exploration
+
+## Age Group distribution  
+```{r}
+ggplot(heart_a, aes(x=age)) + theme_bw() + geom_bar()+ labs(y = 'Number of Patients')
+```
+
+\newpage
+## Gender Distribution
+```{r}
+ggplot(heart_a, aes(x=sex)) + theme_bw() + geom_bar() + labs(y = 'Number of Patients')
+```
+\newpage
+
+## Chest Pain
+```{r}
+heart_a$cp = factor(heart_a$cp,
+                         levels=c(0,1,2,3),
+                         labels=c("typical angina","atypical angina","non-anginal pain","asymptomatic"))
+ggplot(heart_a, aes(x=cp)) + theme_bw() + geom_bar() + labs(y = 'Number of Patients', x = 'Chest Pain')
+```
+
+
+
+\newpage
+## Exercise Induced Angina
+```{r}
+heart_a$exang = factor(heart_a$exang,
+                         levels=c(0,1),
+                         labels=c("No","Yes"))
+ggplot(heart_a, aes(x=exang)) + theme_bw() + geom_bar() + labs(y = 'Number of Patients', x = 'Exercise Induced Angina') 
+```
+
+\newpage
+## Number of major vessels
+```{r}
+ggplot(heart_a, aes(x=ca)) + theme_bw() + geom_bar() + labs(y = 'Number of Patients', x = 'Number of major vessels')
+```
+
+\newpage
+## Resting Blood Pressure
+```{r}
+ggplot(heart_a, aes(x = trestbps)) + theme_bw() + geom_bar() + labs(y = 'Number of Patients', x = 'Resting Blood Pressure')
+```
+
+\newpage
+## Cholestrol Levels
+```{r}
+ggplot(heart_a, aes(x=chol),binwidth = 5) + theme_bw() + geom_bar() + labs(y = 'Number of Patients', x = 'Cholestrol')
+```
+
+
+\newpage
+## Fasting Blood Sugar
+```{r}
+heart_a$fbs = factor(heart_a$fbs,
+                     levels=c(0,1),
+                     labels=c("No","Yes"))
+ggplot(heart_a, aes(x=fbs)) + theme_bw() + geom_bar()+ labs(y = 'Number of Patients', x = 'Fasting Blood Sugar')
+```
+
+
+\newpage
+## Resting ECG
+```{r}
+ggplot(heart_a, aes(x=thalach)) + theme_bw() + geom_bar()+ labs(y = 'Number of Patients', x = 'High heartbeat')
+```
+
+\newpage
+# Exploratory Data Analysis
+## Age Distribution
+```{r}
+ggplot(heart_a) + geom_bar(aes(age, fill=disease), position = 'stack')+ggtitle("Age Distribution with Disease")
+```
+
+-  The Age group between 40-50  has been observed to be more susceptible to heart attack/s
+
+\newpage
+## Rate of Heart attacks for females and males
+```{r}
+male = heart_a[heart_a$sex == "Male",]
+female = heart_a[heart_a$sex == "Female",]
+
+male_wDisease = male[male$disease == "Yes",]
+male_woDisease = male[male$disease == "No",]
+female_wDisease = female[female$disease == "Yes",]
+female_woDisease = female[female$disease == "No",]
+
+pie = data.frame(
+  group = c("Male w/ Heart Attack", "Male wo/ Heart Attack", "Female w/ Heart Attack", "Female wo/ Heart Attack"),
+  value = c(NROW(male_wDisease$disease), NROW(male_woDisease$disease), NROW(female_wDisease$disease), NROW(female_woDisease$disease))
+  )
+
+pie = data.frame(
+  group = c("Male w/ Heart Attack", "Male wo/ Heart Attack", "Female w/ Heart Attack", "Female wo/ Heart Attack"),
+  value = c(NROW(male_wDisease$disease), NROW(male_woDisease$disease), NROW(female_wDisease$disease), NROW(female_woDisease$disease)),
+  per = c((NROW(male_wDisease$disease)/sum(pie$value)), NROW(male_woDisease$disease)/sum(pie$value),NROW(female_wDisease$disease)/sum(pie$value),NROW(female_woDisease$disease)/sum(pie$value))*100
+)
+
+
+lbl = paste(pie$group, round(pie$per, 2))
+lbl = paste(lbl,"%", sep = "")
+
+pie(pie$per, labels = lbl, col=c("green3", "dodgerblue3", "firebrick2", "darkorchid3"), main = "Gender -- Heart Attack Analysis")
+```
+
+- The pie chart indicates that out of the 1028 patients studied for heart attacks , 29% men had experienced heart attacks whereas Females with a history was heart attack was only 8.39% stating that men are at a higher risk of heart diseases and failure
+
+\newpage
+## Chest Pain as an indicator for Heart Disease 
+```{r}
+ggplot(heart_a)+geom_bar(aes(x= cp, fill = disease), position = "stack")+ggtitle("Chest Pain - Heart Attack")+ labs(y = 'Number of Patients', x = 'Chest Pain Type')
+```
+
+- Legends in the graph :
+(i) asymptomatic
+(ii)typical angina
+(iii) atypical angina
+(iv) non-anginal pain
+
+- Out of the 1028 patients studied approximately 110/500 patients who experienced heart attack had asymptomatic heart pain
+- Approximately 130/160 with typical angina experienced heart attack/s
+- Approximately 220/290 with atypical angina experienced heart attack/s
+- Approximately 50/75 with non-anginal pain experienced heart attack/s, making chest pain an important factor to be considered while examining/diagnosing a heart attack
+
+\newpage
+## Resting Blood Pressure
+```{r}
+ggplot(heart_a)+geom_bar(aes(x= trestbps, fill = disease), position = "stack")+ggtitle("Heart attack - resting blood pressure")+ labs(y = 'Number of Patients', x = 'Resting Blood Pressure')
+```
+
+- Patients with a Blood Pressure in the range of 130-150 are at a higher risk of experiencing a heart attack
+
+\newpage
+## Cholesterol and heart attack
+```{r}
+ggplot(heart_a) + geom_histogram(aes(chol, fill=disease), position = 'stack')+ggtitle("Heart attack - Cholesterol ")+ labs(y = 'Number of Patients',x = ' Cholesterol Level')
+```
+
+- Patients with an observed Cholesterol from 200 mg/d and above showed highest share from the patients studied of experiencing a heart attack
+- While  all the  patients with cholesterol with 350 mg/d and above were experiencing a heart attack with an exception of about 8 patients not experiencing one
+- The above analysis makes high cholestrol levels as a key indicator of heart diseases
+
+\newpage
+## Fasting Blood Sugar
+```{r}
+ggplot(heart_a)+geom_bar(aes(x= fbs, fill = disease), position = "stack")+ggtitle("Heart Attack - Fasting Blood Sugar")+ labs(y = 'Number of Patients', x = 'Fasting Blood Sugar')
+```
+
+- 400/800  Patients with Fasting blood sugar < 120 mg/dl experienced a heart attack i.e 50% of patients with low fbs were susceptible to heart diseases
+- Approximately 60/140 patients experienced a heart attack whose Fasting blood sugar > 120 mg/dl
+- The above analysis indicates that Fasting blood sugar is a moderate indciator of heart diseases
+
+\newpage
+## Resting ECG
+```{r}
+ggplot(heart_a)+geom_histogram(aes(x= age, fill = disease), position = "stack",binwidth = 5) + facet_wrap(~  sex + restecg)+ labs(y = 'Number of Patients')
+```
+- Females invariably with a normal resting ECG have been observed to experience heart attack/s
+- About 85% Females having ST-T wave abnormality experienced heart attack/s
+- However, males show a different pattern fewer experienced heart attack/s on a resting ECG
+- Males in the age group of 35- 45  having ST-T wave abnormality experienced more heart attack/s
+
+Legends as below:
+Value 0: normal
+Value 1: having ST-T wave abnormality (T wave inversions and/or ST elevation or depression of > 0.05 mV)
+Value 2: showing probable or definite left ventricular hypertrophy by Estes' criteria
+
+\newpage
+## High heartbeat rate as an indicator for Heart Disease 
+```{r}
+ggplot(heart_a)+geom_bar(aes(x= thalach, fill = disease), position = "stack")+ggtitle("Heart Attack - high heartbeat patients")+ labs(y = 'Number of Patients', x = 'Heartbeat rates')
+```
+- The patients with 150- 200 accounted for the highest heart attack/s amongst the patients studied.
+- Few ranges show a 100% share of the heart attack like ~ 125,160 - 200
+- A little variation is noticed for the patients with higher heart beat not experiencing heart attck contributing to become the outliers in the dataset
+
+\newpage
+# Data Analysis & Modelling
+
+## How strong is the correlation of the predictors with the heart disease
+```{r, echo=TRUE, results='false', message=FALSE, comment="", warning =FALSE, fig.show='hide', include=FALSE}
+heart_a <- dplyr::select_if(heart_a, is.numeric)
+r <- cor(heart_a, use="complete.obs")
+round(r,2)
+#ggcorrplot(r)
+
+#corrplot::corrplot(cor(heart_a))
+
+heart_a_cor <- Hmisc::rcorr(as.matrix(heart_a))
+heart_a_cor
+data.frame(heart_a_cor$r) %>% head() %>% kable()
+
+# p values 
+data.frame(heart_a_cor$P) %>% head() %>% kable()
+cors <- function(df) { 
+  # turn all three matrices (r, n, and P into a data frame)
+  M <- Hmisc::rcorr(as.matrix(df))
+  # return the three data frames in a list return(Mdf)
+  Mdf <- map(M, ~data.frame(.x))
+}
+cors(heart_a) %>% first() %>% head() %>% kable()
+
+cors(heart_a) %>% map(~rownames_to_column(.x, var="measure1")) %>%  first() %>%head() %>%kable()
+
+cors(heart_a) %>%map(~rownames_to_column(.x, var="measure1")) %>%map(~pivot_longer(.x, -measure1, "measure2")) %>%first() %>%
+head() %>%kable()
+
+cors(heart_a) %>%map(~rownames_to_column(.x, var="measure1")) %>%map(~pivot_longer(.x, -measure1, "measure2")) %>%bind_rows(.id = "id") %>%
+head() %>%kable()
+
+cors(heart_a) %>%map(~rownames_to_column(.x, var="measure1")) %>%  map(~pivot_longer(.x, -measure1, "measure2")) %>%bind_rows(.id = "id") %>%
+pivot_wider(names_from = id, values_from = value) %>%head() %>%kable()
+
+
+# if p values are less than 0.05
+cors(heart_a) %>%map(~rownames_to_column(.x, var="measure1")) %>%map(~pivot_longer(.x, -measure1, "measure2")) %>%bind_rows(.id = "id") %>%pivot_wider(names_from = id, values_from = value) %>%mutate(sig_p = ifelse(P < .05, T, F), p_if_sig = ifelse(P <.05, P, NA), r_if_sig = ifelse(r <.05, r, NA)) %>% head() %>%kable()
+
+formatted_cors <- function(df){cors(df) %>%map(~rownames_to_column(.x, var="measure1")) %>%map(~pivot_longer(.x, -measure1, "measure2")) %>% bind_rows(.id = "id") %>%pivot_wider(names_from = id, values_from = value) %>%mutate(sig_p = ifelse(P < .05, T, F), p_if_sig = ifelse(P <.05, P, NA), r_if_sig = ifelse(P <.05, r, NA)) }
+formatted_cors(heart_a) %>% head() %>% kable()
+data.frame(heart_a_cor$n) %>% head(n=3) %>% kable()
+```
+
+```{r}
+formatted_cors(heart_a) %>%ggplot(aes(x = measure1, y = measure2, fill = r)) +geom_tile() +labs(x = NULL, y = NULL, fill = "Pearson's\nCorrelation", title="Correlations in attributes contributing to heart failure") +theme_classic()
+
+formatted_cors(heart_a) %>% ggplot(aes(measure1, measure2, fill=r, label=round(r_if_sig,2))) +geom_tile() +labs(x = NULL, y = NULL, fill = "Pearson's\nCorrelation", title="Correlations in attributes contributing to heart attack", subtitle="Only significant Pearson's correlation coefficients shown") + scale_fill_gradient2(mid="#FBFEF9",low="#0C6291",high="#A63446", limits=c(-1,1)) +geom_text() +theme_classic()  + scale_x_discrete(expand=c(0,0)) +scale_y_discrete(expand=c(0,0))
+```
+
+- The correlation plot signifies the correlation between the 13 variables and the target(heart attack)
+- The plot has been customized to show the significant correlation coefficients where the p- values are less than 0.05
+- Chest pain and maximum heart rate achieved had the strongest positive correlation with heart attack of 42% and 43% respectively
+- Slope defined as The ST segment shift relative to exercise-induced increments in heart rate, the ST/heart rate slope (ST/HR slope), has been proposed as a more accurate ECG criterion for diagnosing significant coronary artery disease (CAD), shows a moderate correlation with a positive  correlation coefficient of 35%
+- Resting ECG shows a positive correlation with the target(heart attack) with a correlation coefficient of 13%
+- The number of blood vessels have a negative correlation of 38% with heart attack/s claiming that higher the number of blood vessels reduce the chances of heart attack 
+- According to the data lesser age group has experienced more heart attack/s
+
+
+\newpage
+# Machine Learning 
+### Creating sensitivity, specificity, and accuracy
+```{r}
+sensitivity = function(cm) {
+  return(cm[1,1]/(cm[1,1]+cm[1,2]))
+}
+
+specificity = function(cm) {
+  return(cm[2,2]/(cm[2,1]+cm[2,2]))
+}
+accuracy = function(cm) {
+  return((cm[1,1]+cm[2,2])/(cm[1,1]+cm[1,2]+cm[2,1]+cm[2,2]))
+}
+```
+
+### Creating the Training and Test Data Sets
+```{r}
+ind = sample(2, nrow(heart), replace=TRUE, prob=c(0.70, 0.30))
+heart$disease = factor(heart$target,
+                         levels=c(0,1),
+                         labels=c("No","Yes"))
+ind = sample(2, nrow(heart), replace=TRUE, prob=c(0.70, 0.30))
+heart.training = heart[ind == 1, 1:13]
+heart.test = heart[ind == 2, 1:13]
+heart.trainLabels = heart[ind ==1, 15]
+heart.testLabels = heart[ind == 2, 15]
+```
+
+## K-nearest neighbors algorithm 
+```{r}
+prediction = knn(train = heart.training,
+                 test = heart.test,
+                 cl = heart.trainLabels$disease,
+                 k= 3)
+result = cbind(prediction, heart.testLabels)
+(confusionMatrix= table(actual_value=result$disease, Predicted_value= result$prediction))
+
+```
+- The performance of this method, on the same test data set as before, can be calculated with the same
+functions we had defined earlier: The sensitivity is `r sensitivity(confusionMatrix)`, the specificity is `r specificity(confusionMatrix)`, and the overall accuracy is `r accuracy(confusionMatrix)`.
+- The nearest neighbour model has nearly more false positives than the false negatives making it unreliable for an accurate prediction of heart attack. We shall need more data points to arrive at a robust model
+
+
+\newpage
+## Logistic Regression 
+```{r}
+trainingWithLabel = heart.training
+trainingWithLabel$disease = heart.trainLabels$disease
+
+logisticModel = glm(disease ~ age + sex + cp + trestbps + chol + fbs +restecg + thalach + exang + 
+                      oldpeak + slope + ca + thal, data = trainingWithLabel,
+                    family = "binomial")
+```
+
+### Predicting the test set:
+```{r}
+prediction = predict(logisticModel, heart.test, type='response')
+heart.test$predicted = ifelse(prediction >.7, 1,0)
+```
+
+### Result of the confusion matrix: 
+```{r}
+result = cbind(heart.testLabels, prediction > .7 )
+(confusionMatrix = table(actual_value=result$disease, Predicted_value=result$`prediction > 0.7` ))
+```
+- The LRR also has more false positives than false negatives making it an unrelaible model to predict a heart attack
+
+- The performance of this method, on the same test data set as before, can be calculated with the same
+functions we had defined earlier: The sensitivity is `r sensitivity(confusionMatrix)`, the specificity is `r specificity(confusionMatrix)`, and the overall accuracy is `r accuracy(confusionMatrix)`.
+
+\newpage
+# Decision Tree
+## Decision on Chest pain, Maxiumum heart rate achieved, and Blood vessels.
+```{r}
+
+model = rpart(disease ~ cp  + thalach+ ca + slope, data = trainingWithLabel,
+               method = "class")
+
+prediction = predict(model, heart.test, type='class')
+(confusionMatrix = table(Actul_Value = heart.testLabels$disease,
+                         Predicted_value = prediction))
+```
+
+- Based on the confusion matrix the DT has more false negatives which are 36 which shall alert a health care physician even in case of no heart attack than the false positives(16) making it more reliable a model to predict a heart attack 
+
+- The performance of this method, on the same test data set as before, can be calculated with the same
+functions we had defined earlier: The sensitivity is `r sensitivity(confusionMatrix)`, the specificity is `r specificity(confusionMatrix)`, and the overall accuracy is `r accuracy(confusionMatrix)`.
+
+\newpage
+## Decision Tree
+```{r}
+rpart.plot(model, box.palette="RdBu", shadow.col="gray", nn=TRUE)
+```
+- Based on the decision tree having asymptomatic chest pain there is 48% chance of not having a heart attack with having one or more critical blood vessels it increases chance of having a heart attack by 20%. Furthermore, having maximum heart rate less than 147 can further decrease the chance of heart attack by 10% but if the slope is less than 2 then it slightly increases the chance of the heart attack.
+
+-  Based on the decision tree having symptomatic chest pain can lead to higher chance of heart attack by 52%. Additionally, having more than one critical blood vessels patients will likely to experience higher chance of heart attack by 17% but if the slope is less then 2 then it decreases the chance of heart attack by 7%.
+
+\newpage
+## XG Boost
+```{r}
+require(caTools)
+new_heart = heart
+library(caret)
+set.seed(80)
+ 
+idx = createDataPartition(new_heart$target, p=.75, list = FALSE)
+ 
+train = new_heart[idx,]
+test = new_heart[-idx,]
+ 
+drop = c('target', 'disease')
+ 
+x_train = train[ , !(names(train) %in% drop)]
+y_train = train$target
+ 
+x_test = test[ , !(names(test) %in% drop)]
+y_test = test$target
+ 
+negative_cases = sum(y_train==0)
+positive_cases = sum(y_train == 1)
+ 
+## Model training
+library(xgboost)
+ 
+dtrain = xgb.DMatrix(data = as.matrix(x_train), label= y_train)
+dtest <- xgb.DMatrix(data = as.matrix(x_test), label= y_test)
+ 
+set.seed(80)
+ 
+xgb_model <- xgboost(data = dtrain,      
+                     max.depth = 4,
+                     nround = 90,
+                     early_stopping_rounds = 3,
+                     objective = "binary:logistic",
+                     scale_pos_weight = negative_cases/positive_cases,
+                     gamma = 1
+)
+ 
+pred = predict(xgb_model, dtest)
+xgbpred = ifelse(pred > 0.50, 1, 0)
+ 
+error = mean(xgbpred != y_test)
+print(paste("Test erorr was", error))
+ 
+##Testing
+ 
+library(caret)
+confusionMatrix(as.factor(xgbpred), as.factor(y_test))
+ 
+```
+
+\newpage
+## Feature importance
+```{r} 
+mat = xgb.importance(feature_names = colnames(y_train), model = xgb_model)
+mat
+xgb.plot.importance(importance_matrix = mat)
+```
+
+- XG Boost has served as  the best classification model of the 4 model we have worked on with highest Accuracy of 96%
+- The false positives and false negatives in the prediction dataset are as small as 5 and 4 respectively stabilizing the false outcomes with a precision of 96.8%(True Positive/ (False Positive + True Positive))
+
+
+
+
+
+\newpage
+# FINAL REMARKS
+- Chest pain is considered the most important factor predicting the risk of heart attack/s which can be observed in all the models - Pearson Correlation and XG Boost
+- Age is an important predictor where patients between the age group of 40-60 are the highest risk of heart attack/s
+- The number of critical blood vessels stand third in the importance predictor predicting  heart attack/s
+- Maximum heart rate achieved and old peak carry a moderately strong correlation with the risk of  heart attack/s
+- Males are prone to more heart attack/s than females
+- Ironically Fasting Blood Sugar (Diabetes) is not a strong predictor for a heart attack/s
+
+
